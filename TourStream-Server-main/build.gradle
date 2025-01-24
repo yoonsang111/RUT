@@ -1,0 +1,151 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.1.3'
+    id 'io.spring.dependency-management' version '1.1.3'
+}
+
+group = 'com.stream.tour'
+version = '0.0.1'
+
+java {
+    sourceCompatibility = '17'
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
+    runtimeOnly 'com.mysql:mysql-connector-j'
+    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+    implementation 'com.h2database:h2'
+
+    implementation 'com.google.guava:guava:32.1.3-jre'
+
+    // =============================
+    // = lombok
+    // =============================
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    testCompileOnly 'org.projectlombok:lombok'
+   	testAnnotationProcessor 'org.projectlombok:lombok'
+
+    // =============================
+    // = security
+    // =============================
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    testImplementation 'org.springframework.security:spring-security-test'
+
+    // =============================
+    // = jwt
+    // =============================
+    implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
+    implementation 'io.jsonwebtoken:jjwt-impl:0.11.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
+//    implementation 'javax.xml.bind:jaxb-api:2.3.1' // XML 문서와 Java 객체 간 매핑을 자동화(Spring Security에서 JWT를 처리할 때 XML 바인딩 작업을 수행하기 때문에 필요)
+
+    // =============================
+    // = redis
+    // =============================
+//    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+    // =============================
+    // = querydsl
+    // =============================
+    implementation "com.querydsl:querydsl-jpa:5.0.0:jakarta"
+    annotationProcessor "com.querydsl:querydsl-apt:5.0.0:jakarta"
+    annotationProcessor "jakarta.annotation:jakarta.annotation-api"
+    annotationProcessor "jakarta.persistence:jakarta.persistence-api"
+
+    // =============================
+    // = p6spy
+    // =============================
+    implementation "com.github.gavlyukovskiy:p6spy-spring-boot-starter:1.9.0"
+
+    // =============================
+    // = swagger
+    // =============================
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.3.0'
+
+    // =============================
+    // = file upload
+    // =============================
+    implementation 'commons-io:commons-io:2.8.0'
+    implementation 'commons-fileupload:commons-fileupload:1.4'
+
+    // =============================
+    // = aws
+    // =============================
+    implementation "io.awspring.cloud:spring-cloud-starter-aws:2.3.1"
+
+    // =============================
+    // = JSON - LocalDate 처리
+    // =============================
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.12.3'
+
+    // =============================
+    // = monitoring
+    // =============================
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    // =============================
+    // = Google Sheets API
+    // =============================
+    implementation 'com.google.api-client:google-api-client:1.25.0'
+    implementation 'com.google.oauth-client:google-oauth-client:1.34.1'
+    implementation 'com.google.apis:google-api-services-sheets:v4-rev612-1.25.0'
+    implementation 'com.google.oauth-client:google-oauth-client-java6:1.21.0'
+    implementation 'com.google.oauth-client:google-oauth-client-jetty:1.21.0'
+    implementation 'com.google.api-client:google-api-client-jackson2:1.20.0'
+
+    // =============================
+    // = gson
+    // =============================
+    testImplementation 'com.google.code.gson:gson:2.10.1'
+}
+
+sourceSets{
+    test{
+        java.srcDirs = ['src/test/java/com', 'src/test/java/unit', 'src/test/java/intg']
+    }
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+// =============================
+// = Querydsl 설정
+// =============================
+def generated = 'src/main/generated'
+
+sourceSets {
+	main.java.srcDir generated
+}
+
+tasks.withType(JavaCompile) {
+    options.annotationProcessorGeneratedSourcesDirectory = file(generated)
+}
+
+// 테스트 코드를 제외한 빌드 수행
+tasks.withType(Test) {
+    enabled = false
+}
+
+clean.doLast {
+	file(generated).deleteDir()
+}

@@ -1,0 +1,97 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+# This workflow will build a Java project with Gradle and cache/restore any dependencies to improve the workflow execution time
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-java-with-gradle
+
+name: Java CI with Gradle
+
+on:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+# 해당 yml 내에서 사용할 key - value
+env:
+  S3_BUCKET_NAME: tour-bucket
+  PROJECT_NAME: tour-stream-backend
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - uses: actions/checkout@v3
+      - run: mkdir -p ./src/main/resources
+      - run: mkdir -p ./src/main/resources/googlesheet
+#      - run: mkdir -p ../logs
+#      - run: sudo chown -R $USER:$USER ./logs
+      - run: touch ./src/main/resources/application.yml
+      - run: touch ./src/main/resources/application-prod.yml
+      - run: touch ./src/main/resources/googlesheet/google_spread_sheet_key.json
+      - run: echo "${{ secrets.APPLICATION }}" > ./src/main/resources/application.yml
+      - run: echo "${{ secrets.APPLICATION_PROD }}" > ./src/main/resources/application-prod.yml
+      - run: echo '${{ secrets.GOOGLE_SHEET_KEY }}' | jq '.' > ./src/main/resources/googlesheet/google_spread_sheet_key.json
+
+      # gradle caching - 빌드 시간 향상
+      - name: Gradle Caching
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Build with Gradle
+        uses: gradle/gradle-build-action@bd5760595778326ba7f1441bcf7e88b49de61a25 # v2.6.0
+        with:
+          arguments: build -x test  # 테스트 코드를 빌드에서 제외
+
+      - name: Build Docker image
+        run: |
+          docker build -t tour-stream-backend:latest .
+          docker save tour-stream-backend:latest > tour-stream-backend.tar
+
+      - name: Make zip file
+        run: zip -r ./$PROJECT_NAME.zip .
+        shell: bash
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # script files 복사
+      - name: Copy script
+        run: cp ./scripts/*.sh ./deploy
+
+      # S3 이전 버전 파일 삭제
+      - name: Delete old version
+        run: aws s3 rm --region ap-northeast-2 s3://$S3_BUCKET_NAME/$PROJECT_NAME --recursive
+
+      # S3에 업로드
+      - name: Upload to S3
+        run: aws s3 cp --region ap-northeast-2 ./$PROJECT_NAME.zip s3://$S3_BUCKET_NAME/$PROJECT_NAME/$GITHUB_SHA.zip
+
+      - name: Deploy
+        run: |
+          aws deploy create-deployment \
+          --application-name tour-deploy \
+          --deployment-config-name CodeDeployDefault.AllAtOnce \
+          --deployment-group-name tour-deploy-prod \
+          --file-exists-behavior OVERWRITE \
+          --s3-location bucket=$S3_BUCKET_NAME,bundleType=zip,key=$PROJECT_NAME/$GITHUB_SHA.zip \
+          --region ${{ secrets.AWS_REGION }} \
